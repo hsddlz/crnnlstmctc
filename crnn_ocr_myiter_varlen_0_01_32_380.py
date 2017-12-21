@@ -33,7 +33,7 @@ class SimpleBatch(object):
         return [(n, x.shape) for n, x in zip(self.label_names, self.label)]
 
 
-def get_padded_label(s,cutoff=45):
+def get_padded_label(s,cutoff=22):
     out = np.zeros(cutoff)
     beforepad = get_label(s)
     #print len(s),len(out)
@@ -107,7 +107,7 @@ class OCRIter(mx.io.DataIter):
         self.path_img = path_img
         self.path_txt = path_txt
         self.init_state_arrays = [mx.nd.zeros(x[1]) for x in init_states]
-        #构建一个白色长条 300*32 然后将图片贴在上面，随后对图片做一些数据曾广，建议数据曾广现在在硬盘里做，当数据足够大后
+        #构建一个灰色长条 380*32 然后将图片贴在上面，随后对图片做一些数据曾广，建议数据曾广现在在硬盘里做，当数据足够大后
         #再考虑用mxnet做数据曾广
         
         self.provide_data = [('data', (batch_size,1,32,380))] + init_states  #高32 长380，然后弄一个300×
@@ -115,7 +115,7 @@ class OCRIter(mx.io.DataIter):
         self.check = check   
 
     '''
-    功能：读取img和label存入data和label的list，data是贴完白纸的
+    功能：读取img和label存入data和label的list，data是贴完灰纸的
     '''
     def __iter__(self):
         #print 'iter'
@@ -146,11 +146,12 @@ class OCRIter(mx.io.DataIter):
                 num += 1#
                 '''
                 数据增广：上下左右随机偏移0-3个像素
+                放缩0.9-1.1
                 '''
                 newimg = np.zeros((32, 380))+img.mean()
                 rand_size=random.uniform(0.9,1.1)
-                rand_1=random.randint(-3,0)
-                rand_2=random.randint(-3,0)
+                rand_1=random.randint(-3,3)
+                rand_2=random.randint(-3,3)
                 try:
                     res=cv2.resize(img,(int(rand_size*img.shape[1]),int(rand_size*img.shape[0])),interpolation=cv2.INTER_CUBIC)
                 except:
@@ -268,8 +269,8 @@ def LCS(p,l):
     return M.max()
 
 def LCS_Purge(p,l):
-    mp = [item for item in p if item!=3562]
-    ml = [item for item in l if item!=3562]
+    mp = [item for item in p if item!=80]
+    ml = [item for item in l if item!=80]
     if len(mp)==0 or len(ml)==0:
         return 0
     P = np.array(list(mp)).reshape((1,len(mp)))
@@ -331,7 +332,7 @@ def Accuracy_LCS_Purge(label, pred):
         return hit / total
 
 def isLabelHan(i):
-    return ( i >= (0 + 63) ) and ( i <= (3498 + 63) )
+    return ( i >= (0 + 63) ) and ( i <= (80) )
 
 
 def Accuracy_LCS_Purge_HanNon(label, pred):
@@ -354,7 +355,7 @@ def Accuracy_LCS_Purge_HanNon(label, pred):
         p = ctc_label(p)
         
         ## Dynamic Programming Finding LCS
-        ml = [item for item in l if item!=3562]
+        ml = [item for item in l if item!=80]
         ml = remove_trailing_zero(ml)
         if len(ml)==0:
             pass
