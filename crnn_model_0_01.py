@@ -111,7 +111,7 @@ def crnn_unroll(num_lstm_layer, seq_len ,
         hidden_all.append(hidden)
 
     hidden_concat = mx.sym.Concat(*hidden_all, dim=0)
-    pred = mx.sym.FullyConnected(data=hidden_concat, num_hidden=91, weight=cls_weight, bias=cls_bias, name='pred')
+    pred = mx.sym.FullyConnected(data=hidden_concat, num_hidden=38, weight=cls_weight, bias=cls_bias, name='pred')
     label = mx.sym.Reshape(data=label, shape=(-1,))
     label = mx.sym.Cast(data = label, dtype = 'int32')
     sm = mx.sym.WarpCTC(data=pred, label=label, label_length = num_label, input_length = seq_len)
