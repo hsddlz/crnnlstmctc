@@ -67,7 +67,7 @@ def loadDataSet(path_txt):
 '''
 读取标签
 '''
-DF = pd.read_csv("freq/seg.csv",sep=',',encoding='utf-8').iloc[:,:5]
+DF = pd.read_excel("seg.xlsx",sep=',',encoding='utf-8').iloc[:,:5]
 CHARSET = ''.join([str(i) for i in range(10)])+''.join([chr(i) for i in range(65,91)])+''.join([chr(i) for i in range(97,123)])
 d_get_label = {}
 d_get_inverse_label = {}
@@ -86,6 +86,7 @@ for i in range(len(DF['label'])):
 def get_label(st):
     global d_get_label
     return [d_get_label[s] if s in d_get_label else 80 for s in st]
+
 
 class OCRIter(mx.io.DataIter):
     '''
@@ -107,7 +108,7 @@ class OCRIter(mx.io.DataIter):
         self.path_img = path_img
         self.path_txt = path_txt
         self.init_state_arrays = [mx.nd.zeros(x[1]) for x in init_states]
-        #构建一个灰色长条 380*32 然后将图片贴在上面，随后对图片做一些数据曾广，建议数据曾广现在在硬盘里做，当数据足够大后
+        #构建一个白色长条 300*32 然后将图片贴在上面，随后对图片做一些数据曾广，建议数据曾广现在在硬盘里做，当数据足够大后
         #再考虑用mxnet做数据曾广
         
         self.provide_data = [('data', (batch_size,1,32,380))] + init_states  #高32 长380，然后弄一个300×
@@ -115,7 +116,7 @@ class OCRIter(mx.io.DataIter):
         self.check = check   
 
     '''
-    功能：读取img和label存入data和label的list，data是贴完灰纸的
+    功能：读取img和label存入data和label的list，data是贴完白纸的
     '''
     def __iter__(self):
         #print 'iter'
@@ -146,7 +147,6 @@ class OCRIter(mx.io.DataIter):
                 num += 1#
                 '''
                 数据增广：上下左右随机偏移0-3个像素
-                放缩0.9-1.1
                 '''
                 newimg = np.zeros((32, 380))+img.mean()
                 rand_size=random.uniform(0.9,1.1)
@@ -318,7 +318,7 @@ def Accuracy_LCS_Purge(label, pred):
         p = ctc_label(p)
         
         ## Dynamic Programming Finding LCS
-        ml = [item for item in l if item!=3562]
+        ml = [item for item in l if item!=80]
         ml = remove_trailing_zero(ml)
         if len(ml)==0:
             pass
@@ -405,12 +405,12 @@ def Accuracy_LCS_Purge_HanNon(label, pred):
 if __name__ == '__main__':
     BATCH_SIZE = 160
     SEQ_LENGTH = 22
-    num_hidden = 1024
+    num_hidden = 256  
     num_lstm_layer = 2
     num_epoch = 100
-    learning_rate = 0.002
+    learning_rate = 0.0005
     momentum = 0.9
-    num_label = 45
+    num_label = 22
 
     # 256*2, lr = 0.002 Best Ever
     
