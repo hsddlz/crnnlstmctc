@@ -4,7 +4,7 @@ sys.path.insert(0, "../../python")
 import numpy as np
 import mxnet as mx
 import codecs
-from crnn_model_0_01 import crnn_unroll
+from crnn_model_0_02_resnet import crnn_unroll
 import pandas as pd
 from io import BytesIO
 from captcha.image import ImageCaptcha
