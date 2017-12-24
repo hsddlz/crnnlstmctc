@@ -38,7 +38,7 @@ class SimpleBatch(object):
 
 def get_label(st):
     global d_get_label
-    return [d_get_label[s] if s in d_get_label else 37 for s in st]  #字符里有就贴字符标号，不认识的字就贴37
+    return [d_get_label[s] if s in d_get_label else 24 for s in st]  #字符里有就贴字符标号，不认识的字就贴37
 
 def get_padded_label(s,cutoff=22):
     out = np.zeros(cutoff)
@@ -46,7 +46,7 @@ def get_padded_label(s,cutoff=22):
     #print len(s),len(out)
     curpos = -1
     for i in range(min(len(s),cutoff)):
-        if i>0 and beforepad[i]==37 and beforepad[i-1]==37:  #连续两个不认识的字符统一认为是一个字符
+        if i>0 and beforepad[i]==24 and beforepad[i-1]==24:  #连续两个不认识的字符统一认为是一个字符
             pass
         else:
             curpos+=1
@@ -58,10 +58,10 @@ def get_padded_label(s,cutoff=22):
 '''
 读取标签
 '''
-DF = pd.read_excel("frq.xls",sep=',',encoding='utf-8').iloc[:,:5]
+DF = pd.read_excel("frqA.xls",sep=',',encoding='utf-8').iloc[:,:5]
 d_get_label = {}
 d_get_inverse_label = {}
-for i in range(36):    #len(DF['index'])
+for i in range(24):    #len(DF['index'])
     d_get_label[DF['index'][i]] = i+1
     d_get_inverse_label[i+1] = unicode(DF['index'][i]) 
 
@@ -107,7 +107,7 @@ class OCRIter(mx.io.DataIter):
         #构建一个灰色长条 380*32 然后将图片贴在上面，随后对图片做一些数据曾广，建议数据曾广现在在硬盘里做，当数据足够大后
         #再考虑用mxnet做数据曾广
         
-        self.provide_data = [('data', (batch_size,1,32,380))] + init_states  #高32 长380
+        self.provide_data = [('data', (batch_size,3,32,380))] + init_states  #高32 长380
         self.provide_label = [('label', (self.batch_size, num_label))]
         self.check = check   
 
@@ -117,6 +117,7 @@ class OCRIter(mx.io.DataIter):
     def __iter__(self):
         #print 'iter'
         init_state_names = [x[0] for x in self.init_states]
+        
         data_name,data_label=loadDataSet(self.path_txt)
         pic_num = len(data_name)
         num = 0
@@ -130,12 +131,20 @@ class OCRIter(mx.io.DataIter):
                     break
                 while 1:
                     #print path_img +'/'+ data_name[num]  
-                    img = cv2.imread(self.path_img +'/'+ data_name[num], 0)#脑残用了dir_list 
+                    res = cv2.imread(self.path_img +'/'+ data_name[num])#脑残用了dir_list 
                     
-                    if img.any() != None:
-                        break        
-                if img.shape[1]>380:
-                    img=cv2.resize(img, (380, 32)) #这段竟然没整出来   正常来讲应该删除但是num不知道怎么控制了)
+                    if res.any() != None:
+                        break    
+                #rand_size=random.uniform(0.9,1.1)
+                #try:
+                    #res=cv2.resize(img,(int(rand_size*img.shape[1]),int(rand_size*img.shape[0])),interpolation=cv2.INTER_CUBIC)
+                #except:
+                    #res=img
+                # if res.shape[0]>32:
+                #     res=res[np.absolute(res.shape[0]-32):32, :]   
+                if res.shape[1]>380:
+                    res=cv2.resize(res, (380, 32)) #这段竟然没整出来   正常来讲应该删除但是num不知道怎么控制了)    
+
                        
                 #data_name_list.append(data_name[num])   #保留看名字
                 label.append(get_padded_label(data_label[num]))
@@ -143,29 +152,32 @@ class OCRIter(mx.io.DataIter):
                 '''
                 数据增广：上下左右随机偏移0-3个像素
                 '''
-                newimg = np.zeros((32, 380))+img.mean()
+                newimg = np.zeros((32, 380,3))+int(res.mean())
+
+
 
                 rand_1=random.randint(-3,3)
-                rand_2=random.randint(-3,3)
-
-                for n in range(rand_1,img.shape[0]):     # 千万不能用i  低级错误
-                    if n-rand_1>=img.shape[0]:
-                        break
-                    for m in range(rand_2,img.shape[1]):
-                        if m-rand_2>=img.shape[1]:
-                            break
-                        newimg[n-rand_1,m-rand_2] = img[n-rand_1,m-rand_2]
+                rand_2=int((380-res.shape[1])*random.random())
                 
-                newimg = newimg.reshape((1,32 , 380)) 
+
+                for n in range(rand_1,res.shape[0]):     # 千万不能用i  低级错误
+                    if n-rand_1>=res.shape[0]:
+                        break
+                    for m in range(rand_2,rand_2+res.shape[1]):
+                        if m-rand_2>=res.shape[1]:
+                            break            
+                        newimg[n-rand_1,m] = res[n-rand_1,m-rand_2]
+                
+                newimg = newimg.reshape((3,32 , 380)) 
                 newimg = np.float32(np.multiply(newimg, 1/255.0))
                 data.append(newimg)
                 
-            #print len(data)
+            
             data_all = [mx.nd.array(data)] + self.init_state_arrays
             label_all = [mx.nd.array(label)]
             data_names = ['data'] + init_state_names
             label_names = ['label']
-
+            
             data_batch = SimpleBatch(data_names, data_all, label_names, label_all)
             yield data_batch
 
@@ -248,8 +260,8 @@ def LCS(p,l):
     return M.max()
 
 def LCS_Purge(p,l):
-    mp = [item for item in p if item!=37]
-    ml = [item for item in l if item!=37]
+    mp = [item for item in p if item!=25]
+    ml = [item for item in l if item!=25]
     if len(mp)==0 or len(ml)==0:
         return 0
     P = np.array(list(mp)).reshape((1,len(mp)))
@@ -330,7 +342,7 @@ def Accuracy_LCS_Purge(label, pred):
         p = ctc_label(p)
         
         ## Dynamic Programming Finding LCS
-        ml = [item for item in l if item!=28]
+        ml = [item for item in l if item!=24]
         ml = remove_trailing_zero(ml)
         if len(ml)==0:
             pass
@@ -380,10 +392,10 @@ def Accuracy_LCS_Purge(label, pred):
 if __name__ == '__main__':
     BATCH_SIZE = 160
     SEQ_LENGTH = 22
-    num_hidden = 256  
+    num_hidden = 512  
     num_lstm_layer = 2
-    num_epoch = 50
-    learning_rate = 0.0003
+    num_epoch = 1000
+    learning_rate = 0.0005
     momentum = 0.9
     num_label = 22
 
@@ -407,8 +419,8 @@ if __name__ == '__main__':
     init_states = init_c + init_h
 
     img_path  = 'images'
-    train_txt = 'train_set.txt' 
-    test_txt  = 'test_set.txt'
+    train_txt = 'train_setA.txt' 
+    test_txt  = 'test_setA.txt'
     data_train = OCRIter(BATCH_SIZE, num_label, init_states, img_path,train_txt, 'train')
     data_val =   OCRIter(BATCH_SIZE, num_label, init_states, img_path,test_txt, 'test')
     
@@ -418,6 +430,7 @@ if __name__ == '__main__':
     symbol = sym_gen(SEQ_LENGTH)
 
     model = mx.model.FeedForward(ctx=contexts,
+                                 
                                  symbol=symbol,
                                  num_epoch=num_epoch,
                                  learning_rate=learning_rate,
@@ -425,6 +438,7 @@ if __name__ == '__main__':
                                  optimizer='adadelta',
                                  wd=0.00001,
                                  initializer=mx.init.Xavier(factor_type="in", magnitude=2.34))
+    #model.bind(for_training=False, data_shapes=[('data', (BATCH_SIZE,3,32,380))])
     
     # load model
     # prefix_load='CRNN_BN_512_1024_1024_1024_ADADELTAMIXLANGUAGE_BATCH128_SEQ22_varlen_1024-2-0.0003-100-mmt0.9-predhan-symbol.json'
@@ -437,6 +451,8 @@ if __name__ == '__main__':
     import logging
     head = '%(asctime)-15s %(message)s'
     logging.basicConfig(level=logging.DEBUG, format=head)
+    logging.basicConfig(filename="gpu0_256.log",level=logging.DEBUG, format=head)
+    
 
     print 'begin fit'
     
